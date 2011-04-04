@@ -28,7 +28,7 @@ if [ ! -f $playerfile ]; then
 fi
 
 #
-# get keydata (need swftools)
+# get keydata (need swftool)
 #
 if [ ! -f $keyfile ]; then
   swfextract -b 5 $playerfile -o $keyfile
@@ -65,9 +65,9 @@ fi
 #
 # get partial key
 #
-authtoken=`cat auth1_fms | perl -ne 'print $1 if(/x-radiko-authtoken: ([\w-]+)/i)'`
-offset=`cat auth1_fms | perl -ne 'print $1 if(/x-radiko-keyoffset: (\d+)/i)'`
-length=`cat auth1_fms | perl -ne 'print $1 if(/x-radiko-keylength: (\d+)/i)'`
+authtoken=`perl -ne 'print $1 if(/x-radiko-authtoken: ([\w-]+)/i)' auth1_fms`
+offset=`perl -ne 'print $1 if(/x-radiko-keyoffset: (\d+)/i)' auth1_fms`
+length=`perl -ne 'print $1 if(/x-radiko-keylength: (\d+)/i)' auth1_fms`
 
 partialkey=`dd if=$keyfile bs=1 skip=${offset} count=${length} 2> /dev/null | base64`
 
@@ -101,7 +101,7 @@ fi
 
 echo "authentication success"
 
-areaid=`cat auth2_fms | perl -ne 'print $1 if(/^([^,]+),/i)'`
+areaid=`perl -ne 'print $1 if(/^([^,]+),/i)' auth2_fms`
 echo "areaid: $areaid"
 
 rm -f auth2_fms
