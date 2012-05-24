@@ -1,8 +1,11 @@
 #!/bin/sh
 
+cd `dirname $0`
+
 playerurl=http://radiko.jp/player/swf/player_2.0.1.00.swf
 playerfile=./player.swf
 keyfile=./authkey.png
+suffix=`date '+%Y%m%d'`
 
 if [ $# -eq 1 ]; then
   channel=$1
@@ -10,6 +13,10 @@ if [ $# -eq 1 ]; then
 elif [ $# -eq 2 ]; then
   channel=$1
   output=$2
+elif [ $# -eq 3 ]; then
+  channel=$1
+  output=$2
+  stop=$3
 else
   echo "usage : $0 channel_name [outputfile]"
   exit 1
@@ -109,11 +116,16 @@ rm -f auth2_fms
 #
 # rtmpdump
 #
+flv="${output}.flv"
+mp3="/var/www/Music/${output}-${suffix}.mp3"
 rtmpdump -v \
+         -B $stop \
          -r "rtmpe://radiko.smartstream.ne.jp" \
          --playpath "simul-stream" \
          --app "${channel}/_defInst_" \
          -W $playerurl \
          -C S:"" -C S:"" -C S:"" -C S:$authtoken \
          --live \
-         --flv $output
+         --flv $flv
+
+ffmpeg -i $flv $mp3
