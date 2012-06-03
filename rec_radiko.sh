@@ -115,11 +115,10 @@ rm -f auth2_fms
 #
 # rtmpdump
 #
-dir="/var/www/Music/${name}"
-basename=`date "+$name %Y-%m-%d"`
-mkdir -p "$dir"
-flv="${dir}/${basename}.flv"
-m4a="/var/www/Music/${name}/${basename}.m4a"
+basename=`date +"/var/www/Music/${name} %Y-%m-%d"`
+flv="${basename}.flv"
+m4a="${basename}.m4a"
+mkdir -p "$(dirname "$flv")" # basename may contain '/'
 rtmpdump -v \
          -B $stop \
          -r "rtmpe://radiko.smartstream.ne.jp" \
