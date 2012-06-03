@@ -117,7 +117,7 @@ rm -f auth2_fms
 # rtmpdump
 #
 flv="${output}.flv"
-mp3="/var/www/Music/${output}-${suffix}.mp3"
+m4a="/var/www/Music/${output}-${suffix}.m4a"
 rtmpdump -v \
          -B $stop \
          -r "rtmpe://radiko.smartstream.ne.jp" \
@@ -128,4 +128,4 @@ rtmpdump -v \
          --live \
          --flv $flv
 
-ffmpeg -i $flv $mp3
+ffmpeg -i $flv -vn -acodec copy $m4a
