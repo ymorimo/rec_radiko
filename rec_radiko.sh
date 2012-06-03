@@ -5,7 +5,7 @@ cd `dirname $0`
 playerurl=http://radiko.jp/player/swf/player_2.0.1.00.swf
 playerfile=./player.swf
 keyfile=./authkey.png
-suffix=`date '+%Y%m%d'`
+suffix=`date '+%Y-%m-%d'`
 
 if [ $# -eq 1 ]; then
   channel=$1
@@ -117,7 +117,8 @@ rm -f auth2_fms
 # rtmpdump
 #
 flv="${output}.flv"
-m4a="/var/www/Music/${output}-${suffix}.m4a"
+m4a="/var/www/Music/${output}/${suffix}.m4a"
+mkdir -p "/var/www/Music/${output}"
 rtmpdump -v \
          -B $stop \
          -r "rtmpe://radiko.smartstream.ne.jp" \
