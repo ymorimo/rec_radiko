@@ -130,5 +130,5 @@ rtmpdump -v \
          --live \
          --flv "$flv"
 
-ffmpeg -i "$flv" -vn -acodec copy "$m4a"
+ffmpeg -i "$flv" -vn -acodec copy "$m4a" && rm "$flv"
 
