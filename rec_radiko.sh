@@ -6,18 +6,15 @@ playerurl=http://radiko.jp/player/swf/player_2.0.1.00.swf
 playerfile=./player.swf
 keyfile=./authkey.png
 
-if [ $# -eq 1 ]; then
+if [ $# -ge 4 ]; then
   channel=$1
-  name=$1
-elif [ $# -eq 2 ]; then
-  channel=$1
-  name=$2
-elif [ $# -eq 3 ]; then
-  channel=$1
-  name=$2
-  stop=$3
+  stop=$(($2 * 60))
+  name=$3
+  artist=$4
+  dir=$5
+  album="Radio: $name"
 else
-  echo "usage : $0 channel_name [name]"
+  echo "usage : $0 channel_name duration_minutes name artist [dir_name]"
   exit 1
 fi
 
@@ -48,7 +45,7 @@ fi
 #
 # access auth1_fms
 #
-id="${channel}_${name//\//_}"
+id="${channel}_${dir}_${name}"
 
 rm -f "auth1_fms_${id}"
 wget -q \
@@ -117,10 +114,11 @@ rm -f "auth2_fms_${id}"
 #
 # rtmpdump
 #
-basename=`date +"/var/www/Music/${name} %Y-%m-%d"`
+title=`date +"${name} %Y-%m-%d"`
+basename="/var/www/Music/${dir:+$dir/}${title}"
 flv="${basename}.flv"
 m4a="${basename}.m4a"
-mkdir -p "$(dirname "$flv")" # basename may contain '/'
+mkdir -p "$(dirname "$basename")" # basename may contain '/'
 
 retries=0
 while :; do
@@ -143,5 +141,10 @@ while :; do
   fi
 done
 
-ffmpeg -y -i "$flv" -vn -acodec copy "$m4a" && rm "$flv"
-
+ffmpeg -y -i "$flv" -vn -acodec copy \
+       -metadata title="$title" \
+       -metadata album="$album" \
+       -metadata artist="$artist" \
+       -metadata genre="Radio" \
+       "$m4a" \
+  && rm "$flv"
