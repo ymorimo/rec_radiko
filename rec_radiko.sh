@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 cd `dirname $0`
 
@@ -45,13 +45,12 @@ if [ ! -f $keyfile ]; then
   fi
 fi
 
-if [ -f auth1_fms ]; then
-  rm -f auth1_fms
-fi
-
 #
 # access auth1_fms
 #
+id="${channel}_${name//\//_}"
+
+rm -f "auth1_fms_${id}"
 wget -q \
      --header="pragma: no-cache" \
      --header="X-Radiko-App: pc_1" \
@@ -61,6 +60,9 @@ wget -q \
      --post-data='\r\n' \
      --no-check-certificate \
      --save-headers \
+     --tries=5 \
+     --timeout=5 \
+     -O "auth1_fms_${id}" \
      https://radiko.jp/v2/api/auth1_fms
 
 if [ $? -ne 0 ]; then
@@ -71,23 +73,20 @@ fi
 #
 # get partial key
 #
-authtoken=`perl -ne 'print $1 if(/x-radiko-authtoken: ([\w-]+)/i)' auth1_fms`
-offset=`perl -ne 'print $1 if(/x-radiko-keyoffset: (\d+)/i)' auth1_fms`
-length=`perl -ne 'print $1 if(/x-radiko-keylength: (\d+)/i)' auth1_fms`
+authtoken=`cat "auth1_fms_${id}" | perl -ne 'print $1 if(/x-radiko-authtoken: ([\w-]+)/i)'`
+offset=`cat "auth1_fms_${id}" | perl -ne 'print $1 if(/x-radiko-keyoffset: (\d+)/i)'`
+length=`cat "auth1_fms_${id}" | perl -ne 'print $1 if(/x-radiko-keylength: (\d+)/i)'`
 
 partialkey=`dd if=$keyfile bs=1 skip=${offset} count=${length} 2> /dev/null | base64`
 
 echo "authtoken: ${authtoken} \noffset: ${offset} length: ${length} \npartialkey: $partialkey"
 
-rm -f auth1_fms
-
-if [ -f auth2_fms ]; then
-  rm -f auth2_fms
-fi
+rm -f "auth1_fms_${id}"
 
 #
 # access auth2_fms
 #
+rm -f "auth2_fms_${id}"
 wget -q \
      --header="pragma: no-cache" \
      --header="X-Radiko-App: pc_1" \
@@ -98,9 +97,12 @@ wget -q \
      --header="X-Radiko-Partialkey: ${partialkey}" \
      --post-data='\r\n' \
      --no-check-certificate \
+     --tries=5 \
+     --timeout=5 \
+     -O "auth2_fms_${id}" \
      https://radiko.jp/v2/api/auth2_fms
 
-if [ $? -ne 0 -o ! -f auth2_fms ]; then
+if [ $? -ne 0 -o ! -f "auth2_fms_${id}" ]; then
   echo "failed auth2 process"
   exit 1
 fi
@@ -110,7 +112,7 @@ echo "authentication success"
 areaid=`perl -ne 'print $1 if(/^([^,]+),/i)' auth2_fms`
 echo "areaid: $areaid"
 
-rm -f auth2_fms
+rm -f "auth2_fms_${id}"
 
 #
 # rtmpdump
@@ -119,15 +121,27 @@ basename=`date +"/var/www/Music/${name} %Y-%m-%d"`
 flv="${basename}.flv"
 m4a="${basename}.m4a"
 mkdir -p "$(dirname "$flv")" # basename may contain '/'
-rtmpdump -v \
-         -B $stop \
-         -r "rtmpe://radiko.smartstream.ne.jp" \
-         --playpath "simul-stream" \
-         --app "${channel}/_defInst_" \
-         -W $playerurl \
-         -C S:"" -C S:"" -C S:"" -C S:$authtoken \
-         --live \
-         --flv "$flv"
+
+retries=0
+while :; do
+  rtmpdump -v \
+           -B $stop \
+           -r "rtmpe://radiko.smartstream.ne.jp" \
+           --playpath "simul-stream" \
+           --app "${channel}/_defInst_" \
+           -W $playerurl \
+           -C S:"" -C S:"" -C S:"" -C S:$authtoken \
+           --live \
+           --flv "$flv"
+  if [ $? -ne 1 -o `wc -c "$flv" | awk '{print $1}'` -ge 10240 ]; then
+    break
+  elif [ $retries -ge 5 ]; then
+    echo "failed rtmpdump"
+    exit 1
+  else
+    retries=$(($retries + 1))
+  fi
+done
 
 ffmpeg -y -i "$flv" -vn -acodec copy "$m4a" && rm "$flv"
 
