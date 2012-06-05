@@ -122,7 +122,7 @@ mkdir -p "$(dirname "$basename")" # basename may contain '/'
 
 retries=0
 while :; do
-  rtmpdump -v \
+  rtmpdump -q -v \
            -B $stop \
            -r "rtmpe://radiko.smartstream.ne.jp" \
            --playpath "simul-stream" \
