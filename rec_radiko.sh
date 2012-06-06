@@ -106,7 +106,7 @@ fi
 
 echo "authentication success"
 
-areaid=`perl -ne 'print $1 if(/^([^,]+),/i)' auth2_fms`
+areaid=`perl -ne 'print $1 if(/^([^,]+),/i)' auth2_fms_${id}`
 echo "areaid: $areaid"
 
 rm -f "auth2_fms_${id}"
