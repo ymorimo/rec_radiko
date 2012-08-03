@@ -45,7 +45,7 @@ fi
 #
 # access auth1_fms
 #
-id="${channel}_${dir}_${name}"
+id="${channel}_${dir}_$(date +'%Y%m%d%H%M%S')"
 
 rm -f "auth1_fms_${id}"
 wget -q \
