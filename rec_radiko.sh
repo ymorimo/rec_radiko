@@ -115,7 +115,7 @@ rm -f "auth2_fms_${id}"
 # rtmpdump
 #
 title=`date +"${name} %Y-%m-%d"`
-basename=`date +"/var/www/Music/${dir:+$dir/}${name}_%Y-%m-%d_%H.%M.%S"`
+basename=`date +"/var/www/Music/${dir:+$dir/}${name}_${channel}_%Y-%m-%d_%H.%M.%S"`
 flv="${basename}.flv"
 m4a="${basename}.m4a"
 mkdir -p "$(dirname "$basename")" # basename may contain '/'
