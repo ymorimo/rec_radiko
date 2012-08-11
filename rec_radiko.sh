@@ -1,5 +1,7 @@
 #!/bin/bash
 
+umask 002
+
 cd `dirname $0`
 
 playerurl=http://radiko.jp/player/swf/player_2.0.1.00.swf
