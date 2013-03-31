@@ -4,7 +4,7 @@ umask 002
 
 cd `dirname $0`
 
-playerurl=http://radiko.jp/player/swf/player_3.0.0.01.swf
+playerurl=http://radiko.jp/player/swf/player_4.0.0.00.swf
 playerfile=./player.swf
 keyfile=./authkey.png
 
