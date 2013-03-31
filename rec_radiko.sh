@@ -140,6 +140,7 @@ while :; do
     exit 1
   else
     retries=$(($retries + 1))
+    echo "rtmpdump retry: $retries"
   fi
 done
 
