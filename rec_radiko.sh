@@ -135,11 +135,12 @@ while :; do
            --flv "$flv"
   if [ $? -ne 1 -o `wc -c "$flv" | awk '{print $1}'` -ge 10240 ]; then
     break
-  elif [ $retries -ge 5 ]; then
+  elif [ $retries -ge 6 ]; then
     echo "failed rtmpdump"
     exit 1
   else
     retries=$(($retries + 1))
+    sleep $(($retries * 2))
     echo "rtmpdump retry: $retries"
   fi
 done
