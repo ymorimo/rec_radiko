@@ -112,6 +112,20 @@ auth2() {
 
 record() {
     #
+    # get stream-url
+    #
+    if [ -f ${channel}.xml ]; then
+	rm -f ${channel}.xml
+    fi
+ 
+    wget -q "http://radiko.jp/v2/station/stream/${channel}.xml"
+
+    stream_url=`echo "cat /url/item[1]/text()" | xmllint --shell ${channel}.xml | tail -2 | head -1`
+    url_parts=(`echo ${stream_url} | perl -pe 's!^(.*)://(.*?)/(.*)/(.*?)$/!$1://$2 $3 $4!'`)
+ 
+    rm -f ${channel}.xml
+
+    #
     # rtmpdump
     #
     title=`date +"${name} %Y-%m-%d"`
@@ -120,15 +134,17 @@ record() {
     m4a="${basename}.m4a"
     mkdir -p "$(dirname "$basename")" # basename may contain '/'
 
-    rtmpdump -q \
-        -B $stop \
-        -r "rtmpe://w-radiko.smartstream.ne.jp" \
-        --playpath "simul-stream.stream" \
-        --app "${channel}/_definst_" \
-        -W $playerurl \
-        -C S:"" -C S:"" -C S:"" -C S:$authtoken \
-        --live \
-        --flv "$flv"
+    # rtmpdump -q \
+    rtmpdump \
+	-r ${url_parts[0]} \
+	--app ${url_parts[1]} \
+	--playpath ${url_parts[2]} \
+	-W $playerurl \
+	-C S:"" -C S:"" -C S:"" -C S:$authtoken \
+	--live \
+	--stop ${duration} \
+	--flv "$flv"
+
     if [ $? -eq 1 -o `wc -c "$flv" | awk '{print $1}'` -lt 10240 ]; then
 	return 1
     fi
@@ -166,7 +182,7 @@ with_retry() {
 #
 if [ $# -ge 4 ]; then
   channel=$1
-  stop=$(($2 * 60))
+  duration=$(($2 * 60))
   name=$3
   artist=$4
   dir=$5
@@ -181,3 +197,4 @@ with_retry get_keydata
 with_retry auth1
 with_retry auth2
 with_retry record
+
