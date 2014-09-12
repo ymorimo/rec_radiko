@@ -66,9 +66,9 @@ auth1() {
     #
     # get partial key
     #
-    authtoken=`cat "auth1_fms_${pid}" | perl -ne 'print $1 if(/x-radiko-authtoken: ([\w-]+)/i)'`
-    offset=`cat "auth1_fms_${pid}" | perl -ne 'print $1 if(/x-radiko-keyoffset: (\d+)/i)'`
-    length=`cat "auth1_fms_${pid}" | perl -ne 'print $1 if(/x-radiko-keylength: (\d+)/i)'`
+    authtoken=`perl -ne 'print $1 if(/x-radiko-authtoken: ([\w-]+)/i)' auth1_fms_${pid}`
+    offset=`perl -ne 'print $1 if(/x-radiko-keyoffset: (\d+)/i)' auth1_fms_${pid}`
+    length=`perl -ne 'print $1 if(/x-radiko-keylength: (\d+)/i)' auth1_fms_${pid}`
 
     partialkey=`dd if=$keyfile bs=1 skip=${offset} count=${length} 2> /dev/null | base64`
 
