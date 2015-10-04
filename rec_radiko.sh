@@ -72,7 +72,7 @@ auth1() {
 
     partialkey=`dd if=$keyfile bs=1 skip=${offset} count=${length} 2> /dev/null | base64`
 
-    echo "authtoken: ${authtoken} \noffset: ${offset} length: ${length} \npartialkey: $partialkey"
+    # echo -e "authtoken: ${authtoken} \noffset: ${offset} length: ${length} \npartialkey: $partialkey"
 
     rm -f "auth1_fms_${pid}"
 }
