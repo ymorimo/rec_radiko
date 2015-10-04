@@ -4,7 +4,6 @@ umask 002
 
 cd `dirname $0`
 
-pid=$$
 playerurl=http://radiko.jp/player/swf/player_4.1.0.00.swf
 playerfile=./player.swf
 keyfile=./authkey.png
@@ -43,7 +42,7 @@ get_keydata() {
 # access auth1_fms
 #
 auth1() {
-    rm -f "auth1_fms_${pid}"
+    rm -f "auth1_fms.$$"
     wget -q \
         --header="pragma: no-cache" \
         --header="X-Radiko-App: pc_1" \
@@ -55,7 +54,7 @@ auth1() {
         --save-headers \
         --tries=5 \
         --timeout=5 \
-        -O "auth1_fms_${pid}" \
+        -O "auth1_fms.$$" \
         https://radiko.jp/v2/api/auth1_fms
 
     if [ $? -ne 0 ]; then
@@ -66,22 +65,22 @@ auth1() {
     #
     # get partial key
     #
-    authtoken=`perl -ne 'print $1 if(/x-radiko-authtoken: ([\w-]+)/i)' auth1_fms_${pid}`
-    offset=`perl -ne 'print $1 if(/x-radiko-keyoffset: (\d+)/i)' auth1_fms_${pid}`
-    length=`perl -ne 'print $1 if(/x-radiko-keylength: (\d+)/i)' auth1_fms_${pid}`
+    authtoken=`perl -ne 'print $1 if(/x-radiko-authtoken: ([\w-]+)/i)' auth1_fms.$$`
+    offset=`perl -ne 'print $1 if(/x-radiko-keyoffset: (\d+)/i)' auth1_fms.$$`
+    length=`perl -ne 'print $1 if(/x-radiko-keylength: (\d+)/i)' auth1_fms.$$`
 
     partialkey=`dd if=$keyfile bs=1 skip=${offset} count=${length} 2> /dev/null | base64`
 
     # echo -e "authtoken: ${authtoken} \noffset: ${offset} length: ${length} \npartialkey: $partialkey"
 
-    rm -f "auth1_fms_${pid}"
+    rm -f "auth1_fms.$$"
 }
 
 #
 # access auth2_fms
 #
 auth2() {
-    rm -f "auth2_fms_${pid}"
+    rm -f "auth2_fms.$$"
     wget -q \
         --header="pragma: no-cache" \
         --header="X-Radiko-App: pc_1" \
@@ -94,20 +93,20 @@ auth2() {
         --no-check-certificate \
         --tries=5 \
         --timeout=5 \
-        -O "auth2_fms_${pid}" \
+        -O "auth2_fms.$$" \
         https://radiko.jp/v2/api/auth2_fms
 
-    if [ $? -ne 0 -o ! -f "auth2_fms_${pid}" ]; then
+    if [ $? -ne 0 -o ! -f "auth2_fms.$$" ]; then
         echo "auth2 failed"
         return 1
     fi
 
     echo "authentication success"
 
-    areaid=`perl -ne 'print $1 if(/^([^,]+),/i)' auth2_fms_${pid}`
+    areaid=`perl -ne 'print $1 if(/^([^,]+),/i)' auth2_fms.$$`
     echo "areaid: $areaid"
 
-    rm -f "auth2_fms_${pid}"
+    rm -f "auth2_fms.$$"
 }
 
 record() {
