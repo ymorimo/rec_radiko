@@ -7,8 +7,63 @@ cd `dirname $0`
 playerurl=http://radiko.jp/player/swf/player_4.1.0.00.swf
 playerfile=./player.swf
 keyfile=./authkey.png
+cookiesfile="./cookies.${pid}"
 
 recordingdir=${RADIKO_OUTDIR:-.}
+
+premium_login() {
+    echo -n 'Logging in to Radiko Premium... '
+
+    if [ -z "$RADIKO_EMAIL" -o -z "$RADIKO_PASSWORD" ]; then
+        echo "Set RADIKO_EMAIL and RADIKO_PASSWORD to log in to Radiko Premium"
+        exit 1
+    fi
+
+    wget -q \
+         --no-check-certificate \
+         --save-cookies=$cookiesfile \
+         --keep-session-cookies \
+         --post-data="mail=$RADIKO_EMAIL&pass=$RADIKO_PASSWORD" \
+         --save-headers \
+         -O /dev/null \
+         https://radiko.jp/ap/member/login/login
+
+    if [ $? -ne 0 ]; then
+        echo "login failed"
+        return 1
+    fi
+
+    trap 'trapped=true; premium_logout' SIGTERM SIGINT
+
+    # check login
+    wget -q \
+         --load-cookies=$cookiesfile \
+         --save-headers \
+         -O /dev/null \
+         https://radiko.jp/ap/member/webapi/member/login/check
+
+    if [ $? -ne 0 ]; then
+        echo "login/check failed"
+        return 1
+    fi
+
+    echo 'ok'
+}
+
+premium_logout() {
+    if [ -f $cookiesfile ]; then
+        wget -q \
+             --no-check-certificate \
+             --load-cookies=$cookiesfile \
+             --save-headers \
+             -O /dev/null \
+             https://radiko.jp/ap/member/webapi/member/logout
+        rm -f $cookiesfile
+        trap - SIGTERM SIGINT
+        echo 'Logged out from radiko.jp'
+    fi
+}
+
 
 #
 # get player
@@ -44,6 +99,7 @@ get_keydata() {
 auth1() {
     rm -f "auth1_fms.$$"
     wget -q \
+        ${is_premium:+--load-cookies=$cookiesfile} \
         --header="pragma: no-cache" \
         --header="X-Radiko-App: pc_1" \
         --header="X-Radiko-App-Version: 2.0.1" \
@@ -82,6 +138,7 @@ auth1() {
 auth2() {
     rm -f "auth2_fms.$$"
     wget -q \
+        ${is_premium:+--load-cookies=$cookiesfile} \
         --header="pragma: no-cache" \
         --header="X-Radiko-App: pc_1" \
         --header="X-Radiko-App-Version: 2.0.1" \
@@ -133,6 +190,7 @@ record() {
     m4a="${basename}.m4a"
     mkdir -p "$(dirname "$basename")" # basename may contain '/'
 
+    echo -n 'Recording...'
     rtmpdump -q \
         -r ${url_parts[0]} \
         --app ${url_parts[1]} \
@@ -142,8 +200,10 @@ record() {
         --live \
         --stop ${duration} \
         --flv "$flv"
+    echo ' done'
 
     if [ $? -eq 1 -o `wc -c "$flv" | awk '{print $1}'` -lt 10240 ]; then
+        echo 'rtmpdump failed'
         return 1
     fi
 
@@ -165,15 +225,35 @@ with_retries() {
         if [ $? -eq 0 ]; then
             break
         elif [ $retries -ge 10 ]; then
-            echo "$cmd failed after 10 retries"
+            echo "\`$cmd\` failed after 10 retries"
+            premium_logout
             exit 1
         else
             retries=$(($retries + 1))
+            echo "Retrying \`$cmd\` after sleeping $retries seconds"
             sleep $retries
-            echo "Retrying $cmd: $retries"
         fi
+        if [ -n "$trapped" ]; then break; fi
     done
 }
+
+
+usage_exit() {
+    echo "Usage: $0 [-p] station_id duration_minutes name artist [subdir]"
+    echo "  -p: Log in to Radiko Premium. Email and password are read from environment variables, RADIKO_EMAIL and RADIKO_PASSWORD."
+    exit 1
+}
+
+
+while getopts p opt; do
+    case $opt in
+        p) is_premium='true'
+           ;;
+        *) usage_exit
+           ;;
+    esac
+done
+shift $((OPTIND - 1))
 
 #
 # main
@@ -186,15 +266,16 @@ if [ $# -ge 4 ]; then
     dir=$5
     album="Radio: $name"
 else
-    echo "usage : $0 station_id duration_minutes name artist [subdir]"
-    exit 1
+    usage_exit
 fi
 
+[ -n "$is_premium" ] && with_retries premium_login
 with_retries get_player
 with_retries get_keydata
 with_retries auth1
 with_retries auth2
 with_retries record
+[ -n "$is_premium" ] && with_retries premium_logout
 
 # Local Variables:
 # indent-tabs-mode: nil
