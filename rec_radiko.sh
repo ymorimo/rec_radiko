@@ -158,10 +158,7 @@ auth2() {
         return 1
     fi
 
-    echo "authentication success"
-
     areaid=`perl -ne 'print $1 if(/^([^,]+),/i)' auth2_fms.$$`
-    echo "areaid: $areaid"
 
     rm -f "auth2_fms.$$"
 }
@@ -190,7 +187,6 @@ record() {
     m4a="${basename}.m4a"
     mkdir -p "$(dirname "$basename")" # basename may contain '/'
 
-    echo -n 'Recording...'
     rtmpdump -q \
         -r ${url_parts[0]} \
         --app ${url_parts[1]} \
@@ -200,20 +196,24 @@ record() {
         --live \
         --stop ${duration} \
         --flv "$flv"
-    echo ' done'
 
     if [ $? -eq 1 -o `wc -c "$flv" | awk '{print $1}'` -lt 10240 ]; then
         echo 'rtmpdump failed'
         return 1
     fi
 
-    ffmpeg -y -i "$flv" -vn -acodec copy \
+    ffmpeg -loglevel quiet \
+        -y -i "$flv" -vn -acodec copy \
         -metadata title="$title" \
         -metadata album="$album" \
         -metadata artist="$artist" \
         -metadata genre="Radio" \
-        "$m4a" \
-        && rm "$flv"
+        "$m4a"
+
+    if [ $? -eq 0 ]; then
+        rm "$flv"
+        echo "Recording done: ${dir:+$dir/}$(basename $m4a)"
+    fi
 }
 
 
