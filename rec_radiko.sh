@@ -9,7 +9,7 @@ playerurl=http://radiko.jp/player/swf/player_4.0.0.00.swf
 playerfile=./player.swf
 keyfile=./authkey.png
 
-recordingdir=/var/www/Radio
+recordingdir=${RADIKO_OUTDIR:-.}
 
 #
 # get player
