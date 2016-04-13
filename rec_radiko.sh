@@ -12,7 +12,7 @@ cookiesfile="./cookies.${pid}"
 recordingdir=${RADIKO_OUTDIR:-.}
 
 premium_login() {
-    echo -n 'Logging in to Radiko Premium... '
+    # echo -n 'Logging in to Radiko Premium... '
 
     if [ -z "$RADIKO_EMAIL" -o -z "$RADIKO_PASSWORD" ]; then
         echo "Set RADIKO_EMAIL and RADIKO_PASSWORD to log in to Radiko Premium"
@@ -47,7 +47,7 @@ premium_login() {
         return 1
     fi
 
-    echo 'ok'
+    # echo 'ok'
 }
 
 premium_logout() {
@@ -60,7 +60,7 @@ premium_logout() {
              https://radiko.jp/ap/member/webapi/member/logout
         rm -f $cookiesfile
         trap - SIGTERM SIGINT
-        echo 'Logged out from radiko.jp'
+        # echo 'Logged out from radiko.jp'
     fi
 }
 
@@ -212,7 +212,7 @@ record() {
 
     if [ $? -eq 0 ]; then
         rm "$flv"
-        echo "Recording done: ${dir:+$dir/}$(basename $m4a)"
+        # echo "Recording done: "${dir:+$dir/}$(basename "$m4a")
     fi
 }
 
