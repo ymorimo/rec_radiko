@@ -202,7 +202,8 @@ record() {
         return 1
     fi
 
-    ffmpeg -loglevel quiet \
+    # Note: -nostats option requires newer version of ffmpeg
+    ffmpeg -loglevel quiet -nostats \
         -y -i "$flv" -vn -acodec copy \
         -metadata title="$title" \
         -metadata album="$album" \
