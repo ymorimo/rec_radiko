@@ -132,57 +132,30 @@ auth() {
 }
 
 record() {
-    #
-    # get stream-url
-    #
-    if [ -f ${station}.xml ]; then
-        rm -f ${station}.xml
-    fi
-
-    wget -q "http://radiko.jp/v2/station/stream/${station}.xml"
-
-    stream_url=`echo "cat /url/item[1]/text()" | xmllint --shell ${station}.xml | tail -2 | head -1`
-    url_parts=(`echo ${stream_url} | perl -pe 's!^(.*)://(.*?)/(.*)/(.*?)$/!$1://$2 $3 $4!'`)
-
-    rm -f ${station}.xml
-
-    #
-    # rtmpdump
-    #
     title=`date +"${name} %Y-%m-%d"`
     basename=`date +"$recordingdir/${dir:+$dir/}${name//\//-}_${station}_%Y-%m-%d_%H.%M.%S"`
-    flv="${basename}.flv"
-    m4a="${basename}.m4a"
+    outfile="${basename}.m4a"
+    tempfile="$recordingdir/recording.$$"
     mkdir -p "$(dirname "$basename")" # basename may contain '/'
 
     rtmpdump -q \
-        -r ${url_parts[0]} \
-        --app ${url_parts[1]} \
-        --playpath ${url_parts[2]} \
+        -r rtmpe://f-radiko.smartstream.ne.jp \
+        --app $station/_definst_ \
+        --playpath simul-stream.stream \
         -W $playerurl \
         -C S:"" -C S:"" -C S:"" -C S:$authtoken \
         --live \
         --stop ${duration} \
-        --flv "$flv"
-
-    if [ $? -eq 1 -o `wc -c "$flv" | awk '{print $1}'` -lt 10240 ]; then
-        echo 'rtmpdump failed'
-        return 1
-    fi
-
-    # Note: -nostats option requires newer version of ffmpeg
-    ffmpeg -loglevel quiet -nostats \
-        -y -i "$flv" -vn -acodec copy \
+        -o - | \
+        ffmpeg -loglevel quiet -nostats \
+        -y -i - -vn -acodec copy \
         -metadata title="$title" \
         -metadata album="$album" \
         -metadata artist="$artist" \
         -metadata genre="Radio" \
-        "$m4a"
+        -f mp4 "$tempfile"
 
-    if [ $? -eq 0 ]; then
-        rm "$flv"
-        # echo "Recording done: "${dir:+$dir/}$(basename "$m4a")
-    fi
+    mv "$tempfile" $outfile
 }
 
 
@@ -240,7 +213,7 @@ fi
 
 [ -n "$is_premium" ] && with_retries premium_login
 with_retries auth
-with_retries record
+record
 [ -n "$is_premium" ] && with_retries premium_logout
 
 # Local Variables:
