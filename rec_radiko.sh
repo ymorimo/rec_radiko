@@ -4,9 +4,7 @@ umask 002
 
 cd `dirname $0`
 
-playerurl=http://radiko.jp/player/swf/player_4.1.0.00.swf
-playerfile=./player.swf
-keyfile=./authkey.png
+playerurl=https://radiko.jp/apps/js/flash/myplayer-release.swf
 cookiesfile="./cookies.${pid}"
 
 recordingdir=${RADIKO_OUTDIR:-.}
@@ -65,53 +63,31 @@ premium_logout() {
 }
 
 
-#
-# get player
-#
-get_player() {
-    if [ ! -f $playerfile ]; then
-        wget -q -O $playerfile $playerurl
+auth() {
+    rm -f "playerCommon.$$"
+    wget -q -O "playerCommon.$$" 'https://radiko.jp/apps/js/playerCommon.js?_=20171113'
+    auth_key=`perl -ne "print \\$1 if (/new RadikoJSPlayer\(.*?'pc_html5',\s*'(\w+)'/)" playerCommon.$$`
+    rm -f "playerCommon.$$"
 
-        if [ $? -ne 0 ]; then
-            echo "get_player failed"
-            return 1
-        fi
+    if [[ -z "$auth_key" ]]; then
+        echo "retrieving auth_key from playerCommon.js failed"
+        return 1
     fi
-}
 
-#
-# get keydata (need swftool)
-#
-get_keydata() {
-    if [ ! -f $keyfile ]; then
-        swfextract -b 14 $playerfile -o $keyfile
-
-        if [ ! -f $keyfile ]; then
-            echo "get_keydata failed"
-            return 1
-        fi
-    fi
-}
-
-#
-# access auth1_fms
-#
-auth1() {
-    rm -f "auth1_fms.$$"
+    rm -f "auth1.$$"
     wget -q \
         ${is_premium:+--load-cookies=$cookiesfile} \
         --header="pragma: no-cache" \
-        --header="X-Radiko-App: pc_1" \
-        --header="X-Radiko-App-Version: 2.0.1" \
+        --header="X-Radiko-App: pc_html5" \
+        --header="X-Radiko-App-Version: 0.0.1" \
         --header="X-Radiko-User: test-stream" \
         --header="X-Radiko-Device: pc" \
-        --post-data='\r\n' \
         --no-check-certificate \
         --save-headers \
         --tries=5 \
         --timeout=5 \
-        -O "auth1_fms.$$" \
-        https://radiko.jp/v2/api/auth1_fms
+        -O "auth1.$$" \
+        https://radiko.jp/v2/api/auth1
 
     if [ $? -ne 0 ]; then
         echo "auth1 failed"
@@ -121,46 +97,38 @@ auth1() {
     #
     # get partial key
     #
-    authtoken=`perl -ne 'print $1 if(/x-radiko-authtoken: ([\w-]+)/i)' auth1_fms.$$`
-    offset=`perl -ne 'print $1 if(/x-radiko-keyoffset: (\d+)/i)' auth1_fms.$$`
-    length=`perl -ne 'print $1 if(/x-radiko-keylength: (\d+)/i)' auth1_fms.$$`
+    authtoken=`perl -ne 'print $1 if(/x-radiko-authtoken: ([\w-]+)/i)' auth1.$$`
+    offset=`perl -ne 'print $1 if(/x-radiko-keyoffset: (\d+)/i)' auth1.$$`
+    length=`perl -ne 'print $1 if(/x-radiko-keylength: (\d+)/i)' auth1.$$`
 
-    partialkey=`dd if=$keyfile bs=1 skip=${offset} count=${length} 2> /dev/null | base64`
+    partialkey=`echo $auth_key | dd bs=1 skip=${offset} count=${length} 2> /dev/null | base64`
 
     # echo -e "authtoken: ${authtoken} \noffset: ${offset} length: ${length} \npartialkey: $partialkey"
 
-    rm -f "auth1_fms.$$"
-}
+    rm -f "auth1.$$"
 
-#
-# access auth2_fms
-#
-auth2() {
-    rm -f "auth2_fms.$$"
+    rm -f "auth2.$$"
     wget -q \
         ${is_premium:+--load-cookies=$cookiesfile} \
         --header="pragma: no-cache" \
-        --header="X-Radiko-App: pc_1" \
-        --header="X-Radiko-App-Version: 2.0.1" \
         --header="X-Radiko-User: test-stream" \
         --header="X-Radiko-Device: pc" \
         --header="X-Radiko-Authtoken: ${authtoken}" \
         --header="X-Radiko-Partialkey: ${partialkey}" \
-        --post-data='\r\n' \
         --no-check-certificate \
         --tries=5 \
         --timeout=5 \
-        -O "auth2_fms.$$" \
-        https://radiko.jp/v2/api/auth2_fms
+        -O "auth2.$$" \
+        https://radiko.jp/v2/api/auth2
 
-    if [ $? -ne 0 -o ! -f "auth2_fms.$$" ]; then
+    if [ $? -ne 0 -o ! -f "auth2.$$" ]; then
         echo "auth2 failed"
         return 1
     fi
 
-    areaid=`perl -ne 'print $1 if(/^([^,]+),/i)' auth2_fms.$$`
+    areaid=`perl -ne 'print $1 if(/^([^,]+),/i)' auth2.$$`
 
-    rm -f "auth2_fms.$$"
+    rm -f "auth2.$$"
 }
 
 record() {
@@ -271,10 +239,7 @@ else
 fi
 
 [ -n "$is_premium" ] && with_retries premium_login
-with_retries get_player
-with_retries get_keydata
-with_retries auth1
-with_retries auth2
+with_retries auth
 with_retries record
 [ -n "$is_premium" ] && with_retries premium_logout
 
