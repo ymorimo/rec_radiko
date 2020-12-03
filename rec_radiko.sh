@@ -155,7 +155,7 @@ record() {
         -metadata genre="Radio" \
         -f mp4 "$tempfile"
 
-    mv "$tempfile" $outfile
+    mv "$tempfile" "$outfile"
 }
 
 
