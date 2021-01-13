@@ -138,17 +138,18 @@ record() {
     tempfile="$recordingdir/recording.$$"
     mkdir -p "$(dirname "$basename")" # basename may contain '/'
 
-    rtmpdump -q \
-        -r rtmpe://f-radiko.smartstream.ne.jp \
-        --app $station/_definst_ \
-        --playpath simul-stream.stream \
-        -W $playerurl \
-        -C S:"" -C S:"" -C S:"" -C S:$authtoken \
-        --live \
-        --stop ${duration} \
-        -o - | \
-        ffmpeg -loglevel quiet -nostats \
-        -y -i - -vn -acodec copy \
+    chunklist_url=$(curl -H "X-Radiko-Authtoken: $authtoken" "https://f-radiko.smartstream.ne.jp/$station/_definst_/simul-stream.stream/playlist.m3u8" | grep '^https://.*\.m3u8$' | head -1)
+
+    if [[ -z "$chunklist_url" ]]; then
+        echo "Couldn't get the chunklist URL."
+        exit 1
+    fi
+
+    ffmpeg -loglevel quiet -nostats \
+        -i "$chunklist_url" \
+        -headers "X-Radiko-Authtoken: $authtoken" \
+        -t $duration \
+        -vn -acodec copy \
         -metadata title="$title" \
         -metadata album="$album" \
         -metadata artist="$artist" \
