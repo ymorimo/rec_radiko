@@ -138,7 +138,7 @@ record() {
     tempfile="$recordingdir/recording.$$"
     mkdir -p "$(dirname "$basename")" # basename may contain '/'
 
-    chunklist_url=$(curl -H "X-Radiko-Authtoken: $authtoken" "https://f-radiko.smartstream.ne.jp/$station/_definst_/simul-stream.stream/playlist.m3u8" | grep '^https://.*\.m3u8$' | head -1)
+    chunklist_url=$(curl -s -H "X-Radiko-Authtoken: $authtoken" "https://f-radiko.smartstream.ne.jp/$station/_definst_/simul-stream.stream/playlist.m3u8" | grep '^https://.*\.m3u8$' | head -1)
 
     if [[ -z "$chunklist_url" ]]; then
         echo "Couldn't get the chunklist URL."
