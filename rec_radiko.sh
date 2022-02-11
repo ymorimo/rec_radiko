@@ -151,6 +151,8 @@ record() {
         -headers "X-Radiko-Authtoken: $authtoken" \
         -t $duration \
         -vn -acodec copy \
+        -bsf:a aac_adtstoasc \
+        -fflags +discardcorrupt \
         -metadata title="$title" \
         -metadata album="$album" \
         -metadata artist="$artist" \
