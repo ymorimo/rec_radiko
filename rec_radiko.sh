@@ -133,7 +133,7 @@ auth() {
 
 record() {
     title=`date +"${name} %Y-%m-%d"`
-    basename=`date +"$recordingdir/${dir:+$dir/}${name//\//-}_${station}_%Y-%m-%d_%H.%M.%S"`
+    basename=`date +"$recordingdir/${dir:+$dir/}${name//\//-} %Y-%m-%d %H-%M-%S"`
     outfile="${basename}.m4a"
     tempfile="$recordingdir/recording.$$"
     mkdir -p "$(dirname "$basename")" # basename may contain '/'
@@ -145,7 +145,8 @@ record() {
         exit 1
     fi
 
-    ffmpeg -loglevel quiet -nostats \
+    ffmpeg -loglevel warning -nostats \
+        -timeout 4000 \
         -i "$chunklist_url" \
         -headers "X-Radiko-Authtoken: $authtoken" \
         -t $duration \
