@@ -133,7 +133,7 @@ auth() {
 
 record() {
     title=`date +"${name} %Y-%m-%d"`
-    basename=`date +"$recordingdir/${dir:+$dir/}${name//\//-} %Y-%m-%d %H-%M-%S"`
+    basename=`date +"$recordingdir/$dir/%Y%m%d"`
     outfile="${basename}.m4a"
     tempfile="$recordingdir/recording.$$"
     mkdir -p "$(dirname "$basename")" # basename may contain '/'
@@ -185,7 +185,7 @@ with_retries() {
 
 
 usage_exit() {
-    echo "Usage: $0 [-p] station_id duration_minutes name artist [subdir]"
+    echo "Usage: $0 [-p] station_id duration_minutes name artist subdir"
     echo "  -p: Log in to Radiko Premium. Email and password are read from environment variables, RADIKO_EMAIL and RADIKO_PASSWORD."
     exit 1
 }
@@ -204,7 +204,7 @@ shift $((OPTIND - 1))
 #
 # main
 #
-if [ $# -ge 4 ]; then
+if [ $# -ge 5 ]; then
     station=$1
     duration=$(($2 * 60))
     name=$3
