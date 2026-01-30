@@ -24,7 +24,7 @@ premium_login() {
          --post-data="mail=$RADIKO_EMAIL&pass=$RADIKO_PASSWORD" \
          --save-headers \
          -O /dev/null \
-         https://radiko.jp/ap/member/login/login
+         https://radiko.jp/ap/member/webapi/member/login
 
     if [ $? -ne 0 ]; then
         echo "login failed"
