@@ -155,7 +155,7 @@ record() {
         "hls://$m3u8_url" best
 
     # Mux the recorded AAC into an m4a container with metadata tags.
-    ffmpeg -loglevel warning -nostats -y \
+    ffmpeg -loglevel error -nostats -y \
         -i "$tempfile" \
         -vn -acodec copy \
         -bsf:a aac_adtstoasc \
