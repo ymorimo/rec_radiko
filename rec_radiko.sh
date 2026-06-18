@@ -149,7 +149,7 @@ record() {
         --http-header "X-Radiko-AreaId=$areaid" \
         --http-header "X-Radiko-Authtoken=$authtoken" \
         --http-header "Referer=https://radiko.jp/" \
-        --stream-segmented-duration "$hls_duration" \
+        --hls-duration "$hls_duration" \
         --force \
         -o "$tempfile" \
         "hls://$m3u8_url" best
