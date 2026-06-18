@@ -138,17 +138,15 @@ record() {
     tempfile="$recordingdir/recording.$$"
     mkdir -p "$(dirname "$basename")" # basename may contain '/'
 
-    chunklist_url=$(curl -s -H "X-Radiko-Authtoken: $authtoken" "https://f-radiko.smartstream.ne.jp/$station/_definst_/simul-stream.stream/playlist.m3u8" | grep '^https://.*\.m3u8$' | head -1)
+    m3u8_url="https://si-f-radiko.smartstream.ne.jp/so/playlist.m3u8?station_id=$station&l=15&lsid=7423879e13315c189ff7d770e423c338&type=b"
 
-    if [[ -z "$chunklist_url" ]]; then
-        echo "Couldn't get the chunklist URL."
-        exit 1
-    fi
-
+    # -seekable 0 -http_seekable 0 -http_persistent 1: required for ffmpeg to
+    # follow the medialist sub-playlist (served as application/x-mpegURL).
     ffmpeg -loglevel warning -nostats \
         -timeout 4000 \
-        -i "$chunklist_url" \
-        -headers "X-Radiko-Authtoken: $authtoken" \
+        -seekable 0 -http_seekable 0 -http_persistent 1 \
+        -headers "X-Radiko-AreaId: $areaid"$'\r\n'"X-Radiko-Authtoken: $authtoken"$'\r\n' \
+        -i "$m3u8_url" \
         -t $duration \
         -vn -acodec copy \
         -bsf:a aac_adtstoasc \
