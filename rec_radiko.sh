@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -e
 umask 002
 
 cd `dirname $0`
@@ -172,8 +173,9 @@ with_retries() {
     cmd=$1
     retries=0
     while :; do
-        $cmd
-        if [ $? -eq 0 ]; then
+        # `if $cmd` keeps set -e from aborting before the retry check, and runs
+        # $cmd's body with errexit disabled so its `return 1` triggers a retry.
+        if $cmd; then
             break
         elif [ $retries -ge 10 ]; then
             echo "\`$cmd\` failed after 10 retries"
