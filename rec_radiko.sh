@@ -135,29 +135,36 @@ record() {
     title=`date +"${name} %Y-%m-%d"`
     basename=`date +"$recordingdir/$dir/%Y%m%d"`
     outfile="${basename}.m4a"
-    tempfile="$recordingdir/recording.$$"
+    tempfile="$recordingdir/recording.$$.aac"
     mkdir -p "$(dirname "$basename")" # basename may contain '/'
 
     m3u8_url="https://si-f-radiko.smartstream.ne.jp/so/playlist.m3u8?station_id=$station&l=15&lsid=7423879e13315c189ff7d770e423c338&type=b"
 
-    # -seekable 0 -http_seekable 0 -http_persistent 1: required for ffmpeg to
-    # follow the medialist sub-playlist (served as application/x-mpegURL).
-    ffmpeg -loglevel warning -nostats \
-        -timeout 4000 \
-        -seekable 0 -http_seekable 0 -http_persistent 1 \
-        -headers "X-Radiko-AreaId: $areaid"$'\r\n'"X-Radiko-Authtoken: $authtoken"$'\r\n' \
-        -i "$m3u8_url" \
-        -t $duration \
+    hls_duration=$(printf '%02d:%02d:%02d' $((duration / 3600)) $((duration % 3600 / 60)) $((duration % 60)))
+
+    streamlink \
+        --loglevel error \
+        --progress no \
+        --http-header "X-Radiko-AreaId=$areaid" \
+        --http-header "X-Radiko-Authtoken=$authtoken" \
+        --http-header "Referer=https://radiko.jp/" \
+        --stream-segmented-duration "$hls_duration" \
+        --force \
+        -o "$tempfile" \
+        "hls://$m3u8_url" best
+
+    # Mux the recorded AAC into an m4a container with metadata tags.
+    ffmpeg -loglevel warning -nostats -y \
+        -i "$tempfile" \
         -vn -acodec copy \
         -bsf:a aac_adtstoasc \
-        -fflags +discardcorrupt \
         -metadata title="$title" \
         -metadata album="$album" \
         -metadata artist="$artist" \
         -metadata genre="Radio" \
-        -f mp4 "$tempfile"
+        -f mp4 "$outfile"
 
-    mv "$tempfile" "$outfile"
+    rm -f "$tempfile"
 }
 
 
@@ -216,7 +223,7 @@ fi
 [ -n "$is_premium" ] && with_retries premium_login
 with_retries auth
 record
-[ -n "$is_premium" ] && with_retries premium_logout
+if [ -n "$is_premium" ]; then with_retries premium_logout; fi
 
 # Local Variables:
 # indent-tabs-mode: nil
