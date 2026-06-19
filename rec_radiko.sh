@@ -134,10 +134,14 @@ auth() {
 
 record() {
     title=`date +"${name} %Y-%m-%d"`
-    basename=`date +"$recordingdir/$dir/%Y%m%d"`
-    outfile="${basename}.m4a"
-    tempfile="$recordingdir/recording.$$.aac"
-    mkdir -p "$(dirname "$basename")" # basename may contain '/'
+    date_part=`date +%Y%m%d`
+    outdir="$recordingdir/$dir" # $dir may contain '/'
+    outfile="$outdir/$date_part.m4a"
+    # Per-run working directory for intermediate files, named with the date and
+    # PID; removed when done.
+    workdir="$outdir/.tmp.$date_part.$$"
+    tempfile="$workdir/recording.aac"
+    mkdir -p "$workdir"
 
     m3u8_url="https://si-f-radiko.smartstream.ne.jp/so/playlist.m3u8?station_id=$station&l=15&lsid=7423879e13315c189ff7d770e423c338&type=b"
 
@@ -165,7 +169,7 @@ record() {
         -metadata genre="Radio" \
         -f mp4 "$outfile"
 
-    rm -f "$tempfile"
+    rm -rf "$workdir"
 }
 
 
