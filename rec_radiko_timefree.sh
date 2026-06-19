@@ -150,9 +150,10 @@ record_one() {
 
 
 usage_exit() {
-    echo "Usage: $0 name artist url [url ...]"
+    echo "Usage: $0 name artist subdir url [url ...]"
     echo "  name:   program name (used as the m4a title)"
     echo "  artist: station name (used as the m4a artist)"
+    echo "  subdir: output subdirectory under \$RADIKO_OUTDIR (created if needed)"
     echo "  url:    timefree program URL or station/datetime, e.g."
     echo "          https://radiko.jp/#!/ts/TBS/20260618140000  or  TBS/20260618140000"
     echo
@@ -165,12 +166,16 @@ usage_exit() {
 #
 # main
 #
-if [ $# -lt 3 ]; then
+if [ $# -lt 4 ]; then
     usage_exit
 fi
 name=$1; shift
 artist=$1; shift
+dir=$1; shift
 urls=("$@")
+
+outdir="$recordingdir/$dir"
+mkdir -p "$outdir"
 
 with_retries auth
 
@@ -225,13 +230,13 @@ cat "${tempfiles[@]}" > "$combined"
 # Output file name: yyyymmdd.m4a, dated from the first URL, with a numeric
 # suffix when a file already exists.
 date_part=${first_ft:0:8}
-outfile="$recordingdir/$date_part.m4a"
+outfile="$outdir/$date_part.m4a"
 if [ -e "$outfile" ]; then
     n=1
-    while [ -e "$recordingdir/${date_part}_$n.m4a" ]; do
+    while [ -e "$outdir/${date_part}_$n.m4a" ]; do
         n=$(($n + 1))
     done
-    outfile="$recordingdir/${date_part}_$n.m4a"
+    outfile="$outdir/${date_part}_$n.m4a"
 fi
 
 title="$name ${date_part:0:4}-${date_part:4:2}-${date_part:6:2}"
