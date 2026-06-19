@@ -280,9 +280,16 @@ for u in "${urls[@]}"; do
         exit 1
     fi
 
-    [ -z "$first_ft" ] && first_ft=$ft
+    # On the first program, create the per-run working directory, named with
+    # the program date and PID, under the output subdirectory.
+    if [ -z "$first_ft" ]; then
+        first_ft=$ft
+        date_part=${ft:0:8}
+        workdir="$outdir/.tmp.$date_part.$$"
+        mkdir -p "$workdir"
+    fi
 
-    tf="$recordingdir/tf.$$.$i.aac"
+    tf="$workdir/tf.$i.aac"
     tempfiles+=("$tf")
     echo "Recording $station $ft-$to -> $tf"
     record_one "$station" "$ft" "$to" "$tf" &
@@ -297,18 +304,17 @@ for p in "${pids[@]}"; do
 done
 if [ $rc -ne 0 ]; then
     echo "A recording failed."
-    rm -f "${tempfiles[@]}"
+    rm -rf "$workdir"
     exit 1
 fi
 
 # Concatenate the AAC files in the requested order (ADTS frames are
 # self-contained, so byte concatenation is safe).
-combined="$recordingdir/combined.$$.aac"
+combined="$workdir/combined.aac"
 cat "${tempfiles[@]}" > "$combined"
 
 # Output file name: yyyymmdd.m4a, dated from the first URL, with a numeric
 # suffix when a file already exists.
-date_part=${first_ft:0:8}
 outfile="$outdir/$date_part.m4a"
 if [ -e "$outfile" ]; then
     n=1
@@ -332,7 +338,7 @@ ffmpeg -loglevel error -nostats -y \
     -metadata genre="Radio" \
     -f mp4 "$outfile"
 
-rm -f "${tempfiles[@]}" "$combined"
+rm -rf "$workdir"
 
 if [ -n "$is_premium" ]; then with_retries premium_logout; fi
 
