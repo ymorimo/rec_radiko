@@ -113,18 +113,24 @@ to_epoch() {
         || date -j -f "%Y%m%d%H%M%S" "$ts" +%s
 }
 
-# Look up a program's end time (to) from the station's program guide. Retries
-# the fetch so a transient error doesn't look like a missing program, and
-# returns non-zero (empty output) when the guide can't be fetched.
+# Look up a program's end time (to) from the station's program guide. radiko
+# sometimes answers a rate-limited request with HTTP 200 and a non-guide body,
+# so the response is validated (must contain a <prog> element) and retried with
+# backoff. Returns non-zero (empty output) if no valid guide is obtained.
 lookup_to() {
-    local station=$1 ft=$2 d xml
+    local station=$1 ft=$2 d xml tries=0
     d=`broadcast_date "$ft"`
-    xml=`curl -s -f --retry 3 --retry-delay 2 "https://radiko.jp/v3/program/station/date/$d/$station.xml"` || true
-    if [ -z "$xml" ]; then
-        echo "Failed to fetch the program guide for $station on $d" >&2
-        return 1
-    fi
-    printf '%s' "$xml" | FT="$ft" perl -ne 'print $1 if (/ft="$ENV{FT}" to="(\d{14})"/)'
+    while [ $tries -lt 5 ]; do
+        xml=`curl -s -f "https://radiko.jp/v3/program/station/date/$d/$station.xml"` || xml=""
+        if printf '%s' "$xml" | LC_ALL=C grep -q '<prog '; then
+            printf '%s' "$xml" | FT="$ft" perl -ne 'print $1 if (/ft="$ENV{FT}" to="(\d{14})"/)'
+            return 0
+        fi
+        tries=$(($tries + 1))
+        sleep $tries
+    done
+    echo "Failed to fetch a valid program guide for $station on $d" >&2
+    return 1
 }
 
 # Record a single timefree program to an AAC file. start_at/end_at are required
