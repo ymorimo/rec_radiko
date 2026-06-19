@@ -7,12 +7,59 @@ cd `dirname $0`
 
 recordingdir=${RADIKO_OUTDIR:-.}
 
+cookiesfile="./cookies.$$"
+
 # Hard-coded radiko stream session id, as in rec_radiko.sh.
 lsid="7423879e13315c189ff7d770e423c338"
 
-# Timefree playlist host (timefree="1", areafree="0" from
-# https://radiko.jp/v3/station/stream/pc_html5/<station>.xml).
-tf_playlist="https://tf-f-rpaa-radiko.smartstream.ne.jp/tf/playlist.m3u8"
+
+premium_login() {
+    if [ -z "$RADIKO_EMAIL" -o -z "$RADIKO_PASSWORD" ]; then
+        echo "Set RADIKO_EMAIL and RADIKO_PASSWORD to log in to Radiko Premium"
+        exit 1
+    fi
+
+    wget -q \
+         --no-check-certificate \
+         --save-cookies=$cookiesfile \
+         --keep-session-cookies \
+         --post-data="mail=$RADIKO_EMAIL&pass=$RADIKO_PASSWORD" \
+         --save-headers \
+         -O /dev/null \
+         https://radiko.jp/ap/member/webapi/member/login
+
+    if [ $? -ne 0 ]; then
+        echo "login failed"
+        return 1
+    fi
+
+    trap 'trapped=true; premium_logout' SIGTERM SIGINT
+
+    # check login
+    wget -q \
+         --load-cookies=$cookiesfile \
+         --save-headers \
+         -O /dev/null \
+         https://radiko.jp/ap/member/webapi/member/login/check
+
+    if [ $? -ne 0 ]; then
+        echo "login/check failed"
+        return 1
+    fi
+}
+
+premium_logout() {
+    if [ -f $cookiesfile ]; then
+        wget -q \
+             --no-check-certificate \
+             --load-cookies=$cookiesfile \
+             --save-headers \
+             -O /dev/null \
+             https://radiko.jp/ap/member/webapi/member/logout
+        rm -f $cookiesfile
+        trap - SIGTERM SIGINT
+    fi
+}
 
 
 auth() {
@@ -28,6 +75,7 @@ auth() {
 
     rm -f "auth1.$$"
     wget -q \
+        ${is_premium:+--load-cookies=$cookiesfile} \
         --header="pragma: no-cache" \
         --header="X-Radiko-App: pc_html5" \
         --header="X-Radiko-App-Version: 0.0.1" \
@@ -55,6 +103,7 @@ auth() {
 
     rm -f "auth2.$$"
     wget -q \
+        ${is_premium:+--load-cookies=$cookiesfile} \
         --header="pragma: no-cache" \
         --header="X-Radiko-User: test-stream" \
         --header="X-Radiko-Device: pc" \
@@ -141,7 +190,7 @@ record_one() {
     local station=$1 ft=$2 to=$3 out=$4 secs dur url
     secs=$(( `to_epoch "$to"` - `to_epoch "$ft"` ))
     dur=`printf '%02d:%02d:%02d' $((secs / 3600)) $((secs % 3600 / 60)) $((secs % 60))`
-    url="$tf_playlist?station_id=$station&start_at=$ft&ft=$ft&end_at=$to&to=$to&l=15&lsid=$lsid&type=b"
+    url="$tf_playlist?station_id=$station&start_at=$ft&ft=$ft&end_at=$to&to=$to&l=15&lsid=$lsid&type=$tf_type"
     streamlink \
         --loglevel error \
         --progress no \
@@ -156,7 +205,9 @@ record_one() {
 
 
 usage_exit() {
-    echo "Usage: $0 name artist subdir url [url ...]"
+    echo "Usage: $0 [-p] name artist subdir url [url ...]"
+    echo "  -p:     Log in to Radiko Premium for area-free recording. Email and"
+    echo "          password are read from RADIKO_EMAIL and RADIKO_PASSWORD."
     echo "  name:   program name (used as the m4a title)"
     echo "  artist: station name (used as the m4a artist)"
     echo "  subdir: output subdirectory under \$RADIKO_OUTDIR (created if needed)"
@@ -172,6 +223,16 @@ usage_exit() {
 #
 # main
 #
+while getopts p opt; do
+    case $opt in
+        p) is_premium='true'
+           ;;
+        *) usage_exit
+           ;;
+    esac
+done
+shift $((OPTIND - 1))
+
 if [ $# -lt 4 ]; then
     usage_exit
 fi
@@ -183,6 +244,18 @@ urls=("$@")
 outdir="$recordingdir/$dir"
 mkdir -p "$outdir"
 
+# Timefree playlist host/type (from the timefree="1" entries of
+# https://radiko.jp/v3/station/stream/pc_html5/<station>.xml): the area-free
+# host is used when logged in to Premium.
+if [ -n "$is_premium" ]; then
+    tf_playlist="https://tf-c-rpaa-radiko.smartstream.ne.jp/tf/playlist.m3u8"
+    tf_type=c
+else
+    tf_playlist="https://tf-f-rpaa-radiko.smartstream.ne.jp/tf/playlist.m3u8"
+    tf_type=b
+fi
+
+[ -n "$is_premium" ] && with_retries premium_login
 with_retries auth
 
 # Parse each URL into station/ft, resolve its end time, and start recording.
@@ -260,6 +333,8 @@ ffmpeg -loglevel error -nostats -y \
     -f mp4 "$outfile"
 
 rm -f "${tempfiles[@]}" "$combined"
+
+if [ -n "$is_premium" ]; then with_retries premium_logout; fi
 
 echo "Wrote $outfile"
 
