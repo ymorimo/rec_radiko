@@ -143,7 +143,15 @@ record() {
     tempfile="$workdir/recording.aac"
     mkdir -p "$workdir"
 
-    m3u8_url="https://si-f-radiko.smartstream.ne.jp/so/playlist.m3u8?station_id=$station&l=15&lsid=7423879e13315c189ff7d770e423c338&type=b"
+    # Area-free (premium) live streaming uses a different host and type.
+    if [ -n "$is_premium" ]; then
+        live_host="si-c-radiko.smartstream.ne.jp"
+        live_type="c"
+    else
+        live_host="si-f-radiko.smartstream.ne.jp"
+        live_type="b"
+    fi
+    m3u8_url="https://$live_host/so/playlist.m3u8?station_id=$station&l=15&lsid=7423879e13315c189ff7d770e423c338&type=$live_type"
 
     hls_duration=$(printf '%02d:%02d:%02d' $((duration / 3600)) $((duration % 3600 / 60)) $((duration % 60)))
 
