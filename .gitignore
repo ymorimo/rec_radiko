@@ -3,3 +3,5 @@ player.swf
 cookies.*
 *.xml
 auth*
+.rec_scheduler.state
+rec_scheduler.log
