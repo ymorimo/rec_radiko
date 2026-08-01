@@ -57,7 +57,16 @@ Cron runs it every minute; a single line covers every program:
 * * * * * cd /path/to/rec_radiko && RADIKO_OUTDIR=rec RADIKO_EMAIL=… RADIKO_PASSWORD=… ./rec_scheduler.rb >> rec_scheduler.log 2>&1
 ```
 
-Options: `-g/--grace MINUTES` (default 60) also runs entries that came due that recently, so a laptop asleep at the scheduled minute still records; `-f/--force` ignores the state file; `-t/--time` fakes the current time; `-n/--dry-run`; `-l/--list`. `RADIKO_STATE` overrides the state file path (default `.rec_scheduler.state`), `RADIKO_AREA` skips the area lookup.
+Options: `-g/--grace MINUTES` (default 60) also runs entries that came due that recently, so a laptop asleep at the scheduled minute still records; `-f/--force` ignores the state file; `-d/--date` records a past day on demand (below); `-t/--time` fakes the current time; `-n/--dry-run`; `-l/--list`. `RADIKO_STATE` overrides the state file path (default `.rec_scheduler.state`), `RADIKO_AREA` skips the area lookup.
+
+`-d/--date` records the entries whose *execution* falls on that date, instead of whatever is due now:
+
+```sh
+./rec_scheduler.rb -d 2026-07-30 conf/cnt.yaml   # that Thursday's こねくと
+./rec_scheduler.rb -d 2026-07-30                 # everything scheduled that day
+```
+
+`YYYY-MM-DD`, `YYYYMMDD` and `MM-DD` (current year) are accepted, `/` works as a separator, and a date that doesn't exist is rejected rather than rolled over (`Time.new(2026, 2, 30)` is March 2nd). Since it is an explicit request, `--date` records regardless of the state file — a second run re-records, and `rec_radiko_timefree.sh` gives the file a `_N` suffix instead of overwriting. **The date is the execution date, matching `wdays`**, so a program radiko lists at 25:00 Monday is `-d` its Tuesday. When no entry matches the date, the run exits 1 and prints each entry's weekdays and nearest matching date rather than doing nothing silently. How far back timefree reaches depends on the account's plan, so no limit is imposed here; an out-of-range date fails in the recorder.
 
 Verifying a change means running it (use a short live duration, or a short timefree program). Inspect the result with `ffprobe -v error -show_entries format=duration:format_tags=title,artist,album,genre -of default=nw=1 <file>`.
 

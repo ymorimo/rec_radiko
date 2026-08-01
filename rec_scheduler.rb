@@ -81,6 +81,30 @@ def format_time_of_day(minutes)
   format('%02d:%02d', minutes / 60, minutes % 60)
 end
 
+# A calendar date, as "YYYY-MM-DD", "YYYYMMDD" or "MM-DD" (the current year).
+# "/" works as a separator too.
+def parse_date(value)
+  y, m, d =
+    case value
+    when %r{\A(\d{4})[-/](\d{1,2})[-/](\d{1,2})\z}, /\A(\d{4})(\d{2})(\d{2})\z/
+      [Regexp.last_match(1), Regexp.last_match(2), Regexp.last_match(3)]
+    when %r{\A(\d{1,2})[-/](\d{1,2})\z}
+      [Time.now.year, Regexp.last_match(1), Regexp.last_match(2)]
+    else
+      raise ArgumentError, "invalid date #{value.inspect} (expected \"YYYY-MM-DD\")"
+    end
+  y, m, d = y.to_i, m.to_i, d.to_i
+  t = begin
+    Time.new(y, m, d, 0, 0, 0)
+  rescue StandardError
+    raise ArgumentError, "invalid date #{value.inspect}"
+  end
+  # Time.new rolls a day past the end of the month over into the next one
+  # (February 30th becomes March 2nd), which would silently record the wrong day.
+  raise ArgumentError, "invalid date #{value.inspect}" unless [t.year, t.month, t.day] == [y, m, d]
+  t
+end
+
 # Midnight of t's date, plus `minutes`.
 def at_time_of_day(t, minutes)
   Time.new(t.year, t.month, t.day, 0, 0, 0) + minutes * 60
@@ -138,6 +162,22 @@ class Entry
       return exec_at if wdays.include?(exec_at.wday) && exec_at >= now
     end
     nil
+  end
+
+  # This entry's execution time on a given date, or nil if it does not run on
+  # that weekday. Note that the date is the date of the *execution*, like
+  # `wdays` -- a program airing at 25:00 is executed, and so dated, the day
+  # after radiko lists it.
+  def at_date(date)
+    exec_at = at_time_of_day(date, execution_time)
+    wdays.include?(exec_at.wday) ? exec_at : nil
+  end
+
+  # The nearest date around `date` on which this entry does run, preferring the
+  # past, or nil if it never does. Used to explain an empty --date run.
+  def nearest_date(date)
+    offset = (1..7).flat_map { |d| [-d, d] }.find { |o| at_date(date + o * 24 * 60 * 60) }
+    offset && at_date(date + offset * 24 * 60 * 60)
   end
 
   def urls(exec_at)
@@ -353,7 +393,7 @@ end
 #
 # main
 #
-options = { grace: 60, dry_run: false, list: false, force: false, now: nil }
+options = { grace: 60, dry_run: false, list: false, force: false, date: nil, now: nil }
 
 parser = OptionParser.new do |o|
   o.banner = "Usage: #{File.basename($PROGRAM_NAME)} [options] [conf ...]"
@@ -368,9 +408,18 @@ parser = OptionParser.new do |o|
     options[:now] = Time.parse(v)
   end
   o.on('-f', '--force', 'Run due entries even if the state file says they already ran') { options[:force] = true }
+  o.on('-d', '--date DATE',
+       'Record the execution of DATE ("YYYY-MM-DD") instead of what is due now') do |v|
+    options[:date] = parse_date(v)
+  end
   o.on('-h', '--help', 'Show this help') { puts o; exit 0 }
 end
-parser.parse!
+begin
+  parser.parse!
+rescue OptionParser::ParseError, ArgumentError => e
+  warn_log e.message
+  exit 1
+end
 
 args = ARGV.empty? ? [File.join(SCRIPT_DIR, 'conf')] : ARGV
 if ARGV.empty? && !File.directory?(args.first)
@@ -408,9 +457,17 @@ state = State.new(ENV['RADIKO_STATE'] || File.join(SCRIPT_DIR, '.rec_scheduler.s
 jobs = []
 confs.each do |conf|
   conf.entries.each do |entry|
-    entry.due_at(now, options[:grace]).each do |exec_at|
+    exec_ats =
+      if options[:date]
+        [entry.at_date(options[:date])].compact
+      else
+        entry.due_at(now, options[:grace])
+      end
+    exec_ats.each do |exec_at|
       key = entry.key(exec_at)
-      next if !options[:force] && state.done?(key)
+      # An explicitly requested date is always recorded; the state file only
+      # guards the automatic, minute-by-minute runs.
+      next if !options[:date] && !options[:force] && state.done?(key)
 
       cmd = [RECORDER]
       cmd << '-p' if premium?(conf)
@@ -421,7 +478,24 @@ confs.each do |conf|
   end
 end
 
-exit 0 if jobs.empty?
+if jobs.empty?
+  # A cron run with nothing due is the normal case and stays quiet, but an
+  # explicit date that matches nothing is a mistake worth explaining -- most
+  # likely a late-night program, whose execution falls on the day after the one
+  # radiko lists it under.
+  if options[:date]
+    warn_log "Nothing scheduled on #{options[:date].strftime('%Y-%m-%d (%a)')}:"
+    confs.each do |conf|
+      conf.entries.each do |entry|
+        nearest = entry.nearest_date(options[:date])
+        warn_log "  #{conf.id}: #{entry.description}" \
+                 "#{nearest ? "  (nearest: #{nearest.strftime('%Y-%m-%d (%a)')})" : ''}"
+      end
+    end
+    exit 1
+  end
+  exit 0
+end
 
 if options[:dry_run]
   jobs.each { |job| puts command_line(job[:cmd]) }
