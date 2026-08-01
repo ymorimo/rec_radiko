@@ -29,7 +29,7 @@ Output goes to `$RADIKO_OUTDIR/<subdir>/yyyymmdd.m4a` (`RADIKO_OUTDIR` defaults 
 
 ### Scheduling (`rec_scheduler.rb`)
 
-One YAML file per program under `conf/`; `id` is the output subdir, `title`/`author` become the m4a title/artist.
+One YAML file per program under `conf/`; `id` is the output subdir, `title`/`author` become the m4a title/artist. What to record is a local choice, so `conf/` is not checked in — `conf.sample.yaml` documents the format and is the file to copy there. It sits outside `conf/` on purpose, since the scheduler would otherwise record the sample along with everything else.
 
 ```yaml
 ---

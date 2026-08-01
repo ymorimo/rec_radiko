@@ -5,3 +5,5 @@ cookies.*
 auth*
 .rec_scheduler.state
 rec_scheduler.log
+# What to record is a local choice; conf.sample.yaml documents the format.
+conf/

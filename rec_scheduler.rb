@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # Scheduled timefree recording driver.
 #
-# Reads per-program YAML files (see conf/cnt.yaml) and, for every schedule
+# Reads per-program YAML files (see conf.sample.yaml) and, for every schedule
 # entry that is due, launches rec_radiko_timefree.sh with the program start
 # times of that entry. Designed to be run once a minute from cron:
 #

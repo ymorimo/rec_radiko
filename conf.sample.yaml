@@ -1,0 +1,36 @@
+---
+# A program for rec_scheduler.rb, one file per program under conf/. What to
+# record is a local choice, so conf/ is not checked in -- copy this file there
+# to add a program. It lives outside conf/ on purpose: the scheduler records
+# every *.yaml it finds in that directory, sample included.
+
+id: cnt                       # output subdir (rec/cnt/yyyymmdd.m4a), also the state key
+area: JP13                    # the program's area; recorded area-free (-p) when it isn't ours
+station: TBS                  # default station, an entry may override it
+title: こねくと                # m4a title
+author: TBSラジオ              # m4a artist
+image: https://example.com/cnt.jpg   # unused by the scheduler
+
+# One entry per recording. The programs of an entry are recorded in the order
+# given and concatenated into a single file.
+#
+# Quote every time: Psych reads an unquoted 16:03 as the integer 57780 (YAML
+# 1.1 sexagesimal), and an unquoted [14:00, 15:00] is a syntax error.
+schedule:
+  - wdays: [Mon, Tue, Wed, Thu]           # weekdays of the *execution*, not of the program
+    program_times: ["14:00", "15:00", "16:00"]
+    execution_time: "16:03"               # must be after the last program has ended
+
+  # A program time later than execution_time belongs to the day before, which
+  # is what lets a Sunday 21:00 program be recorded after midnight.
+  - wdays: [Mon]
+    station: QRR                          # this entry overrides the station above
+    program_times: ["21:00"]
+    execution_time: "00:03"
+
+  # radiko lists a late-night program as Saturday 25:00, but it airs -- and so
+  # is recorded -- at 01:00 on Sunday. wdays and program_times both use the
+  # real clock time, so this reads Sun 01:00, not Sat 25:00.
+  - wdays: [Sun]
+    program_times: ["01:00"]
+    execution_time: "01:03"
