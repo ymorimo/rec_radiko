@@ -174,7 +174,14 @@ lookup_to() {
     local station=$1 ft=$2 d xml tries=0
     d=`broadcast_date "$ft"`
     while [ $tries -lt 5 ]; do
-        xml=`curl -s -f "https://radiko.jp/v3/program/station/date/$d/$station.xml"` || xml=""
+        # The body is filtered through tr because the endpoint occasionally
+        # answers with binary: bash 5 warns "ignored null byte in input" when a
+        # command substitution captures a NUL, where bash 3.2 on macOS drops it
+        # without a word. Such a body fails the <prog check below and is retried
+        # like any other bad response, so nothing is lost by stripping it. The
+        # pipe also means the substitution takes tr's status rather than curl's,
+        # which is what keeps `set -e` from aborting on a failed fetch.
+        xml=`curl -s -f "https://radiko.jp/v3/program/station/date/$d/$station.xml" | tr -d '\000'`
         if printf '%s' "$xml" | LC_ALL=C grep -q '<prog '; then
             printf '%s' "$xml" | FT="$ft" perl -ne 'print $1 if (/ft="$ENV{FT}" to="(\d{14})"/)'
             return 0
