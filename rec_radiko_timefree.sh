@@ -149,9 +149,13 @@ with_retries() {
 # radiko's broadcast day runs 05:00-28:59, so a program before 05:00 is listed
 # under the previous calendar day. Subtract 5 hours from the start time and take
 # the date. Try GNU date first, then fall back to BSD/macOS date.
+#
+# It has to be "5 hours ago": GNU date reads the -5 of "-5 hours" as the time
+# zone UTC-05:00 instead of a relative offset, and answers the wrong day without
+# failing, so the BSD fallback never gets a chance to correct it.
 broadcast_date() {
     local ft=$1
-    date -d "${ft:0:4}-${ft:4:2}-${ft:6:2} ${ft:8:2}:${ft:10:2}:${ft:12:2} -5 hours" +%Y%m%d 2>/dev/null \
+    date -d "${ft:0:4}-${ft:4:2}-${ft:6:2} ${ft:8:2}:${ft:10:2}:${ft:12:2} 5 hours ago" +%Y%m%d 2>/dev/null \
         || date -j -v-5H -f "%Y%m%d%H%M%S" "$ft" +%Y%m%d
 }
 
