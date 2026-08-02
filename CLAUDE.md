@@ -57,7 +57,9 @@ Cron runs it every minute; a single line covers every program:
 * * * * * cd /path/to/rec_radiko && RADIKO_OUTDIR=rec RADIKO_EMAIL=… RADIKO_PASSWORD=… ./rec_scheduler.rb >> rec_scheduler.log 2>&1
 ```
 
-Options: `-g/--grace MINUTES` (default 60) also runs entries that came due that recently, so a laptop asleep at the scheduled minute still records; `-f/--force` ignores the state file; `-d/--date` records a past day on demand (below); `-t/--time` fakes the current time; `-n/--dry-run`; `-l/--list`. `RADIKO_STATE` overrides the state file path (default `.rec_scheduler.state`), `RADIKO_AREA` skips the area lookup.
+Options: `-g/--grace MINUTES` (default 60) also runs entries that came due that recently, so a laptop asleep at the scheduled minute still records; `-f/--force` ignores the state file; `-d/--date` records a past day on demand (below); `-p/--premium` logs in for every recording; `-t/--time` fakes the current time; `-n/--dry-run`; `-l/--list`.
+
+Normally the scheduler decides on its own whether to pass `-p` to the recorder, by comparing the entry's `area` with this machine's. That is not the only thing a login is for, though: **timefree only reaches back a week without one**, however local the station is. Since the conf file can't express that, `-p/--premium` forces the login on, and is what to combine with `--date` when recording something older than a week. `RADIKO_STATE` overrides the state file path (default `.rec_scheduler.state`), `RADIKO_AREA` skips the area lookup.
 
 `-d/--date` records the entries whose *execution* falls on that date, instead of whatever is due now:
 

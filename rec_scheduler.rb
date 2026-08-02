@@ -341,21 +341,37 @@ def current_area
     end
 end
 
+def have_credentials?
+  !ENV['RADIKO_EMAIL'].to_s.empty? && !ENV['RADIKO_PASSWORD'].to_s.empty?
+end
+
 # Area-free recording is needed when the program's area is not ours. If the
 # area lookup failed we can't tell, so premium is used whenever credentials are
 # available -- an area-free recording of a local station still works.
-def premium?(conf)
+#
+# The area is not the only thing that needs a login: timefree only reaches back
+# a week without one, however local the station is, so a program older than that
+# has to be recorded as premium as well. That case can't be told from the conf
+# file, which is why `force` (--premium) exists.
+def premium?(conf, force = false)
+  if force
+    unless have_credentials?
+      warn_log "#{conf.id}: --premium was given but RADIKO_EMAIL / RADIKO_PASSWORD " \
+               'are unset; the recording will fail'
+    end
+    return true
+  end
+
   return false if conf.area.nil? || conf.area.empty?
   area = current_area
-  have_credentials = !ENV['RADIKO_EMAIL'].to_s.empty? && !ENV['RADIKO_PASSWORD'].to_s.empty?
   if area.nil?
     warn_log "Couldn't determine the current area; " \
-             "#{have_credentials ? 'recording as premium' : 'recording without premium'}"
-    return have_credentials
+             "#{have_credentials? ? 'recording as premium' : 'recording without premium'}"
+    return have_credentials?
   end
   return false if area == conf.area
 
-  unless have_credentials
+  unless have_credentials?
     warn_log "#{conf.id}: area #{conf.area} is not ours (#{area}) but " \
              'RADIKO_EMAIL / RADIKO_PASSWORD are unset; the recording will fail'
   end
@@ -393,7 +409,7 @@ end
 #
 # main
 #
-options = { grace: 60, dry_run: false, list: false, force: false, date: nil, now: nil }
+options = { grace: 60, dry_run: false, list: false, force: false, premium: false, date: nil, now: nil }
 
 parser = OptionParser.new do |o|
   o.banner = "Usage: #{File.basename($PROGRAM_NAME)} [options] [conf ...]"
@@ -412,6 +428,8 @@ parser = OptionParser.new do |o|
        'Record the execution of DATE ("YYYY-MM-DD") instead of what is due now') do |v|
     options[:date] = parse_date(v)
   end
+  o.on('-p', '--premium',
+       'Log in for every recording, as a program older than a week needs') { options[:premium] = true }
   o.on('-h', '--help', 'Show this help') { puts o; exit 0 }
 end
 begin
@@ -470,7 +488,7 @@ confs.each do |conf|
       next if !options[:date] && !options[:force] && state.done?(key)
 
       cmd = [RECORDER]
-      cmd << '-p' if premium?(conf)
+      cmd << '-p' if premium?(conf, options[:premium])
       cmd += [conf.title, conf.author, conf.id]
       cmd += entry.urls(exec_at)
       jobs << { key: key, conf: conf, exec_at: exec_at, cmd: cmd }
