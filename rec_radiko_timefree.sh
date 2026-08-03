@@ -355,6 +355,11 @@ if [ -n "$is_premium" ]; then with_retries premium_logout; fi
 
 echo "Wrote $outfile"
 
+# A failed upload must not fail the run: the recording is on disk, and the
+# scheduler would otherwise record the whole thing again. The next upload_s3.sh
+# picks it up, since sync uploads whatever is missing.
+./upload_s3.sh "$dir" || echo "Upload to S3 failed; $outfile is kept locally." >&2
+
 # Local Variables:
 # indent-tabs-mode: nil
 # sh-basic-offset: 4

@@ -9,6 +9,7 @@ Two Bash scripts that record radiko (Japanese internet radio) to tagged `.m4a` f
 - `rec_radiko.sh` — records the **live** stream for a fixed duration.
 - `rec_radiko_timefree.sh` — records one or more past programs from **timefree** (タイムフリー), recorded in parallel and concatenated in order into a single file.
 - `rec_scheduler.rb` — reads per-program YAML files under `conf/` and runs `rec_radiko_timefree.sh` when an entry is due. Meant to be run once a minute from cron.
+- `upload_s3.sh` — `aws s3 sync`s finished recordings to S3. Called by both recorders at the end of a run, and runnable on its own.
 
 ### Running
 
@@ -26,6 +27,17 @@ RADIKO_EMAIL=… RADIKO_PASSWORD=… ./rec_radiko.sh -p TBS 60 name artist subdi
 ```
 
 Output goes to `$RADIKO_OUTDIR/<subdir>/yyyymmdd.m4a` (`RADIKO_OUTDIR` defaults to `.`). Timefree adds a `_N` suffix on filename collision.
+
+### Uploading (`upload_s3.sh`)
+
+Both recorders finish by calling `./upload_s3.sh <subdir>`, which does nothing unless `RADIKO_S3_BUCKET` names a bucket — so a machine that only records needs no aws credentials, and there is no bucket name in the repository.
+
+```sh
+RADIKO_S3_BUCKET=my-bucket ./upload_s3.sh cnt golden   # those subdirs of $RADIKO_OUTDIR
+RADIKO_S3_BUCKET=my-bucket ./upload_s3.sh              # every subdir
+```
+
+Syncing is idempotent, so the no-argument form also works from cron as a catch-up for anything an earlier upload missed.
 
 ### Scheduling (`rec_scheduler.rb`)
 
@@ -99,6 +111,8 @@ Intermediate files live in a per-run working dir `<outdir>/.tmp.<date>.<pid>/`, 
 - **Premium / area-free uses different hosts.** Timefree switches the playlist host (`tf-f-…`/`type=b` → `tf-c-…`/`type=c`) and sends the login cookie during auth when `-p` is set.
 - **Psych reads an unquoted `16:01` as the integer 57660** (YAML 1.1 sexagesimal), and an unquoted `[14:00, 15:00]` is a *syntax error*. Conf files quote their times; `parse_time_of_day` accepts the integer form anyway so an unquoted block-style list still works.
 - **`program_times` are resolved backwards from `execution_time`.** A program time later than the execution time belongs to the previous day, which is what makes `"23:00"` recorded at `00:30`, and the `"25:00"` of a late-night program recorded at `02:30`, both land on the right date (`program_time_for`).
+- **A failed upload must not fail the recording.** `set -e` is on, so a bare `upload_to_s3` at the end of a recorder turns an S3 hiccup into a non-zero exit; the scheduler then marks the entry failed and *records the whole program again* on a later minute. The call is `./upload_s3.sh "$dir" || echo … >&2` for that reason — the file is already on disk, and the next sync uploads it.
+- **`aws s3 sync --exclude` matches the path relative to the source directory**, which takes *two* patterns to exclude everything hidden. Syncing `<outdir>/<subdir>/` makes the working directory the first component, so `'*/.tmp.*'` matches nothing and uploads the partial `.aac`, while `'.*'` alone still lets through a `.DS_Store` below the first level. `--exclude '.*' --exclude '*/.*'` covers both. The working-directory half only shows up when a recording of the same subdir is still running (or a killed run left one behind), so it passes casual testing.
 - **The scheduler must be idempotent per minute**, since cron fires it every minute and the grace window spans many. `.rec_scheduler.state` keys `<id>|<entry index>|<execution time>` and is written *before* the recording starts; a failed entry is retried on later minutes up to `MAX_ATTEMPTS`, and a `running` entry left behind by a killed process unblocks after `STALE_RUNNING`.
 
 ## Conventions
