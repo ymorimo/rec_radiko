@@ -9,6 +9,9 @@
 # scripts can call it unconditionally and a machine that only records needs no
 # aws credentials. Syncing is idempotent, so this is also safe to run from cron
 # to pick up whatever an earlier upload missed.
+#
+# Every uploaded file is named when run from a terminal, and nothing is printed
+# when the output is not one, which is how it stays quiet under cron.
 
 set -e
 umask 002
@@ -18,6 +21,11 @@ cd `dirname $0`
 recordingdir=${RADIKO_OUTDIR:-.}
 
 [ -n "$RADIKO_S3_BUCKET" ] || exit 0
+
+# From cron, by way of the recorders, this runs for every recording, and the
+# interesting part of that log is the recording -- not a list of uploads.
+quiet=
+[ -t 1 ] || quiet=--quiet
 
 if ! command -v aws >/dev/null 2>&1; then
     echo "RADIKO_S3_BUCKET is set but the aws command is not on PATH." >&2
@@ -47,7 +55,7 @@ for dir in "$@"; do
     # Patterns are matched against the path relative to $src, so both forms are
     # needed -- ".*" alone leaves a hidden file below the first level.
     aws s3 sync "$src/" "s3://$RADIKO_S3_BUCKET/$dir/" \
-        --exclude '.*' --exclude '*/.*' --quiet || rc=1
+        --exclude '.*' --exclude '*/.*' $quiet || rc=1
 done
 
 exit $rc

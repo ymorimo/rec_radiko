@@ -117,5 +117,5 @@ Intermediate files live in a per-run working dir `<outdir>/.tmp.<date>.<pid>/`, 
 
 ## Conventions
 
-- Quiet by default: streamlink `--loglevel error --progress no`, ffmpeg `-loglevel error`. Successful runs should be near-silent; errors still surface.
+- Quiet by default: streamlink `--loglevel error --progress no`, ffmpeg `-loglevel error`. Successful runs should be near-silent; errors still surface. `upload_s3.sh` decides by `[ -t 1 ]` instead: `aws s3 sync` names every uploaded file when someone is watching, and takes `--quiet` when the output is a log, so cron — where it runs once per recording by way of the recorders — stays quiet.
 - Keep the two scripts' shared `auth()` / `with_retries()` in sync when changing one.
