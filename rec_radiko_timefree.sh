@@ -226,7 +226,7 @@ usage_exit() {
     echo "          https://radiko.jp/#!/ts/TBS/20260618140000  or  TBS/20260618140000"
     echo
     echo "Multiple URLs are recorded in parallel and concatenated in the given"
-    echo "order into a single yyyymmdd.m4a (dated from the first URL)."
+    echo "order into a single \"yyyymmdd name.m4a\" (dated from the first URL)."
     exit 1
 }
 
@@ -324,15 +324,16 @@ fi
 combined="$workdir/combined.aac"
 cat "${tempfiles[@]}" > "$combined"
 
-# Output file name: yyyymmdd.m4a, dated from the first URL, with a numeric
-# suffix when a file already exists.
-outfile="$outdir/$date_part.m4a"
+# Output file name: "yyyymmdd name.m4a", dated from the first URL, with a
+# numeric suffix when a file already exists.
+basename_part="$date_part $name"
+outfile="$outdir/$basename_part.m4a"
 if [ -e "$outfile" ]; then
     n=1
-    while [ -e "$outdir/${date_part}_$n.m4a" ]; do
+    while [ -e "$outdir/${basename_part}_$n.m4a" ]; do
         n=$(($n + 1))
     done
-    outfile="$outdir/${date_part}_$n.m4a"
+    outfile="$outdir/${basename_part}_$n.m4a"
 fi
 
 title="$name ${date_part:0:4}-${date_part:4:2}-${date_part:6:2}"

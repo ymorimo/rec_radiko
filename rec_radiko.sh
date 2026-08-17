@@ -136,7 +136,7 @@ record() {
     title=`date +"${name} %Y-%m-%d"`
     date_part=`date +%Y%m%d`
     outdir="$recordingdir/$dir" # $dir may contain '/'
-    outfile="$outdir/$date_part.m4a"
+    outfile="$outdir/$date_part $name.m4a"
     # Per-run working directory for intermediate files, named with the date and
     # PID; removed when done.
     workdir="$outdir/.tmp.$date_part.$$"

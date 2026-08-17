@@ -26,7 +26,7 @@ RADIKO_OUTDIR=rec ./rec_radiko_timefree.sh 'こねくと' 'TBSラジオ' golden 
 RADIKO_EMAIL=… RADIKO_PASSWORD=… ./rec_radiko.sh -p TBS 60 name artist subdir
 ```
 
-Output goes to `$RADIKO_OUTDIR/<subdir>/yyyymmdd.m4a` (`RADIKO_OUTDIR` defaults to `.`). Timefree adds a `_N` suffix on filename collision.
+Output goes to `$RADIKO_OUTDIR/<subdir>/yyyymmdd <name>.m4a` (`RADIKO_OUTDIR` defaults to `.`). Timefree adds a `_N` suffix on filename collision.
 
 ### Uploading (`upload_s3.sh`)
 
