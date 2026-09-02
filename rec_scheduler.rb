@@ -31,8 +31,21 @@ WDAYS = {
 
 MAX_ATTEMPTS = 3
 
+# Retries back off exponentially instead of happening on the next cron minute.
+# Most failures come from the program guide endpoint rate-limiting us, and three
+# tries in three minutes only make that worse. The wait starts at RETRY_BACKOFF
+# and doubles with every attempt, so the retries of a 3-attempt entry fall about
+# 5 and 15 minutes after it first came due -- well inside the default grace
+# window, which is what lets a retry be seen at all.
+RETRY_BACKOFF = 5 * 60
+
 # A recording left in the "running" state for this long is assumed dead.
 STALE_RUNNING = 3 * 60 * 60
+
+# How long to wait after `attempts` failed attempts before trying again.
+def retry_delay(attempts)
+  RETRY_BACKOFF * 2**([attempts, 1].max - 1)
+end
 
 
 # Render a command for display. Shellwords.join backslash-escapes every
@@ -259,15 +272,25 @@ class State
   end
 
   # A recording is not started again once it succeeded, and a failing one is
-  # retried on the following minutes only up to MAX_ATTEMPTS times.
+  # retried only up to MAX_ATTEMPTS times, each retry waiting out its backoff.
   def done?(key)
     v = @data[key]
     return false if v.nil?
     return true if v['status'] == 'ok'
     return true if v['attempts'].to_i >= MAX_ATTEMPTS
+    return true if v['status'] == 'failed' && !retry_due?(v)
     # A recording still in flight blocks a second start, unless it is old
     # enough that the process must have died with the state left behind.
     v['status'] == 'running' && !stale?(v)
+  end
+
+  # Whether enough time has passed since the failure recorded in `v`. An
+  # unreadable timestamp retries right away, as it did before the backoff.
+  def retry_due?(v)
+    at = Time.parse(v['at'].to_s)
+    Time.now - at >= retry_delay(v['attempts'].to_i)
+  rescue StandardError
+    true
   end
 
   def stale?(v)
@@ -275,6 +298,11 @@ class State
     Time.now - at > STALE_RUNNING
   rescue StandardError
     true
+  end
+
+  # How many times the recording of this key has been started so far.
+  def attempts(key)
+    (@data[key] || {})['attempts'].to_i
   end
 
   def start(key)
@@ -376,6 +404,33 @@ def premium?(conf, force = false)
              'RADIKO_EMAIL / RADIKO_PASSWORD are unset; the recording will fail'
   end
   true
+end
+
+
+# Say what becomes of a failed recording: when the next retry is due, or that
+# there will not be one -- `done?` skips it from then on, so without this the
+# recording is simply never mentioned again. Only for the automatic path;
+# --date and --force ignore the state file and never retry on their own.
+def report_failure(state, job, grace_minutes)
+  attempts = state.attempts(job[:key])
+  scheduled = job[:exec_at].strftime('%Y-%m-%d %H:%M')
+  give_up = lambda do |why|
+    warn_log "Giving up on #{job[:conf].id} (scheduled #{scheduled}) #{why}; " \
+             "to record it by hand: #{command_line(job[:cmd])}"
+  end
+
+  return give_up.call("after #{MAX_ATTEMPTS} attempts") if attempts >= MAX_ATTEMPTS
+
+  delay = retry_delay(attempts)
+  # A retry only happens while the entry is still within the grace window, so a
+  # backoff that reaches past it is the end of the road too.
+  if Time.now + delay > job[:exec_at] + grace_minutes * 60
+    return give_up.call("after #{attempts} attempt#{attempts == 1 ? '' : 's'}: the next retry " \
+                        "would fall outside the #{grace_minutes} minute grace window")
+  end
+
+  warn_log "Retrying #{job[:conf].id} (scheduled #{scheduled}) in about #{delay / 60} minutes " \
+           "(attempt #{attempts + 1} of #{MAX_ATTEMPTS})"
 end
 
 
@@ -520,6 +575,10 @@ if options[:dry_run]
   exit 0
 end
 
+# --date and --force bypass the state file, so nothing is retried or given up on
+# for them; only the plain cron path has a next attempt to report.
+automatic = !options[:date] && !options[:force]
+
 pids = {}
 jobs.each do |job|
   log "Running #{job[:conf].id} (scheduled #{job[:exec_at].strftime('%Y-%m-%d %H:%M')}): " \
@@ -530,6 +589,7 @@ jobs.each do |job|
     warn_log "Couldn't start #{job[:conf].id}: #{e.message}"
     state.start(job[:key])
     state.finish(job[:key], 'failed')
+    report_failure(state, job, options[:grace]) if automatic
     next
   end
   pids[pid] = job
@@ -549,6 +609,7 @@ pids.each do |pid, job|
   else
     state.finish(job[:key], 'failed')
     warn_log "Recording #{job[:conf].id} failed (exit #{status.exitstatus})"
+    report_failure(state, job, options[:grace]) if automatic
     failed = true
   end
 end
