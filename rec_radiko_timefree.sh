@@ -181,7 +181,11 @@ lookup_to() {
         # like any other bad response, so nothing is lost by stripping it. The
         # pipe also means the substitution takes tr's status rather than curl's,
         # which is what keeps `set -e` from aborting on a failed fetch.
-        xml=`curl -s -f "https://radiko.jp/v3/program/station/date/$d/$station.xml" | tr -d '\000'`
+        #
+        # --compressed is required: the endpoint gzips the body even when the
+        # request doesn't ask for it, and without decompression the guide never
+        # passes the check (tr also fails on it with "Illegal byte sequence").
+        xml=`curl -s -f --compressed "https://radiko.jp/v3/program/station/date/$d/$station.xml" | tr -d '\000'`
         if printf '%s' "$xml" | LC_ALL=C grep -q '<prog '; then
             printf '%s' "$xml" | FT="$ft" perl -ne 'print $1 if (/ft="$ENV{FT}" to="(\d{14})"/)'
             return 0
